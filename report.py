@@ -170,7 +170,7 @@ def generate_pdf(df_resultado, norma_key, veredicto, empresa="", archivo="") -> 
     pdf.ln(10)
     pdf.set_font("Courier", "", 7)
     pdf.set_text_color(150, 150, 150)
-    pdf.cell(190, 4, "Documento generado automaticamente por MTC Validator — adaga.tech", ln=True, align="C")
+    pdf.cell(190, 4, "Documento generado automaticamente por MTC Validator - adaga.tech", ln=True, align="C")
     pdf.cell(190, 4, "Este dictamen es valido unicamente para el lote analizado", ln=True, align="C")
     
     # Return as bytes
