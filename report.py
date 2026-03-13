@@ -6,6 +6,7 @@ from io import BytesIO
 from datetime import datetime
 from fpdf import FPDF
 import pandas as pd
+from normas import NORMAS
 
 
 def generate_pdf(df_resultado, norma_key, verdict):
@@ -76,10 +77,10 @@ def generate_pdf(df_resultado, norma_key, verdict):
         valor = f"{row['valor']:.2f}" if isinstance(row['valor'], (int, float)) else str(row['valor'])
         resultado = str(row['resultado'])
         
-        # Obtener min/max desde el diccionario de normas (necesitamos importarlo)
-        # Por ahora usamos espacios
-        min_val = "-"
-        max_val = "-"
+        # Obtener min/max desde el diccionario de normas
+        specs = NORMAS.get(norma_key, {}).get(str(row['elemento']), {})
+        min_val = str(specs.get('min', '-'))
+        max_val = str(specs.get('max', '-'))
         
         # Colorear fila según resultado
         if "APROBADO" in resultado:
