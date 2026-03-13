@@ -1,3 +1,38 @@
+# PROMPT COMPLETO — Rediseño Estético MTC Validator
+# Copia TODO este bloque y pégalo en Copilot Chat (Ctrl+I en VS Code)
+
+---
+
+## INSTRUCCIÓN PARA COPILOT:
+
+Refactoriza completamente el archivo `app.py` de una aplicación Streamlit llamada **MTC Validator**.
+Mantén TODA la lógica existente intacta (imports, validación, PDF, lógica de normas).
+Solo cambia la capa visual/UI. No toques `normas.py`, `validator.py`, ni `report.py`.
+
+---
+
+## PASO 1 — Actualiza `.streamlit/config.toml` con este contenido exacto:
+
+```toml
+[theme]
+primaryColor = "#00d4a0"
+backgroundColor = "#080c10"
+secondaryBackgroundColor = "#0d1218"
+textColor = "#c8d8e8"
+font = "monospace"
+
+[client]
+showErrorDetails = true
+
+[logger]
+level = "info"
+```
+
+---
+
+## PASO 2 — Reemplaza `app.py` completo con este código:
+
+```python
 """
 MTC Validator — Rediseño Industrial Precision
 """
@@ -343,7 +378,7 @@ if archivo_subido is not None:
         df_display = df_resultado[["elemento", "valor", "resultado", "desviacion"]].copy()
         df_display.columns = ["Elemento", "Valor MTC", "Resultado", "Desviación"]
 
-        styled = df_display.style.map(color_resultado, subset=["Resultado"])
+        styled = df_display.style.applymap(color_resultado, subset=["Resultado"])
         st.dataframe(styled, use_container_width=True, hide_index=True)
 
         # PDF download
@@ -374,3 +409,32 @@ else:
         '</div>',
         unsafe_allow_html=True
     )
+```
+
+---
+
+## PASO 3 — Verifica que `requirements.txt` tenga exactamente esto:
+
+```
+streamlit>=1.28.0
+pandas>=2.0.0
+openpyxl>=3.10.0
+fpdf2>=2.7.0
+```
+
+---
+
+## PASO 4 — Instala dependencias y corre:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+---
+
+## NOTAS IMPORTANTES:
+- NO modifiques `normas.py`, `validator.py`, ni `report.py`
+- El CSS usa Google Fonts (JetBrains Mono + Syne) — requiere conexión a internet
+- Si Streamlit muestra advertencias de `applymap` deprecated, reemplaza por `map`
+- El diseño replica exactamente la paleta: bg #080c10, accent #00d4a0, superficie #0d1218
