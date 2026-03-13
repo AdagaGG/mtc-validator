@@ -36,6 +36,10 @@ wheels/
 .streamlit/secrets.toml
 .streamlit/cache/
 
+# Security — LOCAL CREDENTIALS ONLY
+config.yaml
+*.db
+
 # OS
 .DS_Store
 Thumbs.db
