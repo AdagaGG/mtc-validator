@@ -188,40 +188,66 @@ def _extract_mistral(pdf_bytes: bytes) -> pd.DataFrame:
     Fallback OCR using Mistral Pixtral API for scanned PDFs.
     Only called if pdfplumber returns fewer than 3 elements.
     Requires MISTRAL_API_KEY in st.secrets.
-    Converts PDF to image (PNG) before sending to Mistral using PyMuPDF + PIL.
+    Converts PDF to image and uploads to imgbb for temporary public URL.
     """
-    api_key = st.secrets.get("MISTRAL_API_KEY", None)
-    if not api_key:
+    api_key_mistral = st.secrets.get("MISTRAL_API_KEY", None)
+    api_key_imgbb = st.secrets.get("IMGBB_API_KEY", None)
+    
+    if not api_key_mistral:
+        return pd.DataFrame(columns=['elemento', 'valor'])
+    
+    if not api_key_imgbb:
+        print("Warning: IMGBB_API_KEY not configured for OCR fallback")
         return pd.DataFrame(columns=['elemento', 'valor'])
 
     if not HAS_PYMUPDF:
-        print("Warning: PyMuPDF not installed, Mistral OCR unavailable")
+        print("Warning: PyMuPDF not installed")
         return pd.DataFrame(columns=['elemento', 'valor'])
 
     try:
-        # Convert PDF to image using PyMuPDF + PIL for robust JPEG encoding
+        # Convert PDF to image using PyMuPDF
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         if len(doc) < 1:
             return pd.DataFrame(columns=['elemento', 'valor'])
         
-        # Render first page to image
         page = doc[0]
-        pix = page.get_pixmap(matrix=fitz.Matrix(1, 1))  # 1x zoom (original size)
+        pix = page.get_pixmap(matrix=fitz.Matrix(1, 1))
         
-        # Convert PyMuPDF pixmap to PIL Image
+        # Convert to PIL Image
         img_data = pix.tobytes("ppm")
         img = Image.open(io.BytesIO(img_data))
         
-        # Resize to max 800x800
-        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+        # Resize if necessary
+        img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+        img = img.convert('RGB')
         
-        # Convert to JPEG with low quality for smallest size
+        # Save to bytes
         img_byte_arr = io.BytesIO()
-        img = img.convert('RGB')  # Ensure RGB for JPEG
-        img.save(img_byte_arr, format='JPEG', quality=60, optimize=True)
+        img.save(img_byte_arr, format='JPEG', quality=80, optimize=True)
         img_byte_arr.seek(0)
-        img_b64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
         
+        # Upload to imgbb
+        print("Uploading image to imgbb...")
+        files = {'image': img_byte_arr.getvalue()}
+        data = {'key': api_key_imgbb, 'expiration': '600'}  # 10 min expiry
+        
+        upload_resp = requests.post(
+            "https://api.imgbb.com/1/upload",
+            files=files,
+            data=data,
+            timeout=30
+        )
+        upload_resp.raise_for_status()
+        upload_result = upload_resp.json()
+        
+        if not upload_result.get('success'):
+            print(f"imgbb upload failed: {upload_result}")
+            return pd.DataFrame(columns=['elemento', 'valor'])
+        
+        image_url = upload_result['data']['url']
+        print(f"✓ Image uploaded: {image_url}")
+        
+        # Now call Mistral with public URL
         payload = {
             "model": "pixtral-12b",
             "max_tokens": 1000,
@@ -244,23 +270,26 @@ def _extract_mistral(pdf_bytes: bytes) -> pd.DataFrame:
                     },
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
+                        "image_url": {"url": image_url}
                     }
                 ]
             }]
         }
+        
         resp = requests.post(
             "https://api.mistral.ai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {api_key_mistral}", "Content-Type": "application/json"},
             json=payload,
             timeout=30
         )
         resp.raise_for_status()
         content = resp.json()['choices'][0]['message']['content']
+        
         # Clean markdown fences if present
         content = content.replace('```json', '').replace('```', '').strip()
         data = json.loads(content)
         return pd.DataFrame(data)
+        
     except Exception as e:
         print(f"Error in _extract_mistral: {e}")
         import traceback
@@ -271,10 +300,10 @@ def _extract_mistral(pdf_bytes: bytes) -> pd.DataFrame:
 # ===== PUBLIC API =====
 
 METHOD_MESSAGES = {
-    "pdfplumber":         ("✅ Extraído con pdfplumber (PDF digital)", "success"),
-    "mistral_ocr":        ("🤖 Extraído con Mistral OCR (PDF escaneado)", "info"),
-    "mistral_unavailable":("⚠️ Mistral API no configurada — solo PDFs digitales soportados.", "warning"),
-    "not_found":          ("❌ No se detectaron datos. Verifica que sea un MTC válido o usa la plantilla Excel.", "error"),
+    "pdfplumber":           ("✅ Extraído con pdfplumber (PDF digital)", "success"),
+    "mistral_ocr":          ("🤖 Extraído con Mistral OCR + imgbb (PDF escaneado)", "info"),
+    "mistral_unavailable":  ("⚠️ API keys de Mistral/imgbb no configuradas", "warning"),
+    "not_found":            ("❌ No se detectaron datos. Verifica que sea un MTC válido", "error"),
 }
 
 
