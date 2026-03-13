@@ -239,7 +239,7 @@ with st.sidebar:
     with col_a:
         st.metric("ELEMENTOS", len(NORMAS[norma_seleccionada]))
     with col_b:
-        st.metric("NORMA", norma_seleccionada.replace("_", " "))
+        st.metric("NORMA", norma_seleccionada.replace("ASTM_", "").replace("AISI", ""))
 
     st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     st.markdown(
