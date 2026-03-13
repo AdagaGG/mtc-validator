@@ -70,12 +70,17 @@ def load_config():
         st.stop()
 
 def verify_credentials(username: str, password: str, config: dict) -> dict:
-    """Verify username and password"""
+    """Verify username and password - normalize username (trim + lowercase)"""
+    # Normalize username: remove leading/trailing spaces and convert to lowercase
+    username = username.strip().lower()
+    
     users = config.get('credentials', {}).get('usernames', {})
-    if username in users:
-        user = users[username]
-        if user.get('password') == password:
-            return user
+    # Normalize all stored usernames for comparison
+    for user_key in users:
+        if user_key.lower() == username:
+            user = users[user_key]
+            if user.get('password') == password:
+                return user
     return None
 
 # Initialize session state
