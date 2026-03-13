@@ -1,0 +1,15 @@
+[project]
+name = "mtc-validator"
+version = "0.1.0"
+description = "Validador de especificaciones metalúrgicas según normas ASTM/SAE"
+requires-python = ">=3.9"
+dependencies = [
+    "streamlit>=1.28.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.10.0",
+    "fpdf2>=2.7.0",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
