@@ -19,7 +19,7 @@ print("=" * 80)
 
 api_key_mistral = "kSh23thqlPbBtR1A0EKhm7qvmk8t32gr"
 # Aquí irá tu API key de imgbb (obtén una gratis en https://api.imgbb.com/)
-api_key_imgbb = "YOUR_IMGBB_API_KEY"  # Reemplaza esto con tu API key
+api_key_imgbb = "daa2afcd0165786e57e9b73bcba26de6"
 
 try:
     print(f"\n1. Loading PDF...")
