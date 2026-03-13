@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── CSS Global ───────────────────────────────────────────────────────────────
+# ── CSS Global — PRIMERO ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap');
@@ -135,53 +135,44 @@ hr { border-color: #1e2835 !important; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: #080c10; }
 ::-webkit-scrollbar-thumb { background: #263040; border-radius: 2px; }
+
+/* Custom classes */
+.logo-header {
+  margin-bottom: 1.5rem;
+}
+.section-title {
+  margin-bottom: 1rem;
+}
+.metric-kpi {
+  font-size: 0.65rem;
+  color: #4a6070;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+.verdict-banner {
+  border-radius: 6px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+.verdict-pass {
+  background: rgba(0,212,160,0.07);
+  border: 1px solid rgba(0,212,160,0.3);
+}
+.verdict-fail {
+  background: rgba(255,77,106,0.10);
+  border: 1px solid rgba(255,77,106,0.3);
+}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ── Helpers HTML ─────────────────────────────────────────────────────────────
-def badge(text, tipo="pass"):
-    colors = {
-        "pass": ("rgba(0,212,160,0.12)", "#00d4a0", "rgba(0,212,160,0.25)"),
-        "fail": ("rgba(255,77,106,0.10)", "#ff4d6a", "rgba(255,77,106,0.25)"),
-        "neutral": ("rgba(106,128,144,0.12)", "#6a8090", "rgba(106,128,144,0.25)"),
-    }
-    bg, color, border = colors.get(tipo, colors["neutral"])
-    return (
-        f'<span style="display:inline-block;background:{bg};color:{color};'
-        f'border:1px solid {border};padding:2px 8px;border-radius:3px;'
-        f'font-size:0.7rem;font-weight:600;letter-spacing:0.07em;">{text}</span>'
-    )
-
-def verdict_banner(texto, subtexto, tipo="pass"):
-    if tipo == "pass":
-        bg = "rgba(0,212,160,0.07)"
-        border = "rgba(0,212,160,0.3)"
-        color = "#00d4a0"
-        dot_shadow = "0 0 8px rgba(0,212,160,0.5)"
-    else:
-        bg = "rgba(255,77,106,0.10)"
-        border = "rgba(255,77,106,0.3)"
-        color = "#ff4d6a"
-        dot_shadow = "0 0 8px rgba(255,77,106,0.5)"
-
-    return f"""
-    <div style="background:{bg};border:1px solid {border};border-radius:6px;
-                padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:1rem;">
-      <div style="width:10px;height:10px;border-radius:50%;background:{color};
-                  box-shadow:{dot_shadow};flex-shrink:0;"></div>
-      <div>
-        <div style="font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:700;color:{color};">
-          {texto}
-        </div>
-        <div style="font-size:0.7rem;color:#6a8090;margin-top:2px;">{subtexto}</div>
-      </div>
-    </div>
-    """
-
 def logo_header():
     return """
-    <div style="margin-bottom:1.5rem;">
+    <div class="logo-header">
       <div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.12em;margin-bottom:4px;">
         &gt; SISTEMA ACTIVO
       </div>
@@ -198,7 +189,7 @@ def logo_header():
 def section_title(text, sub=None):
     sub_html = f'<div style="font-size:0.7rem;color:#4a6070;margin-top:2px;">{sub}</div>' if sub else ""
     return f"""
-    <div style="margin-bottom:1rem;">
+    <div class="section-title">
       <div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#c8d8e8;">
         {text}
       </div>
@@ -206,11 +197,34 @@ def section_title(text, sub=None):
     </div>
     """
 
+def verdict_banner(texto, subtexto, tipo="pass"):
+    if tipo == "pass":
+        color = "#00d4a0"
+        dot_shadow = "0 0 8px rgba(0,212,160,0.5)"
+        banner_class = "verdict-banner verdict-pass"
+    else:
+        color = "#ff4d6a"
+        dot_shadow = "0 0 8px rgba(255,77,106,0.5)"
+        banner_class = "verdict-banner verdict-fail"
+
+    return f"""
+    <div class="{banner_class}">
+      <div style="width:10px;height:10px;border-radius:50%;background:{color};
+                  box-shadow:{dot_shadow};flex-shrink:0;"></div>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:700;color:{color};">
+          {texto}
+        </div>
+        <div style="font-size:0.7rem;color:#6a8090;margin-top:2px;">{subtexto}</div>
+      </div>
+    </div>
+    """
+
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(logo_header(), unsafe_allow_html=True)
-    st.markdown('<div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:6px;">NORMA ACTIVA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="metric-kpi">NORMA ACTIVA</div>', unsafe_allow_html=True)
 
     norma_seleccionada = st.selectbox(
         "Norma",
@@ -241,7 +255,7 @@ st.markdown(section_title("Validador de Certificados MTC", "Normas ASTM / SAE �
 col_upload, col_info = st.columns([2, 1], gap="large")
 
 with col_upload:
-    st.markdown('<div style="font-size:0.65rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:8px;">CARGAR CERTIFICADO</div>', unsafe_allow_html=True)
+    st.markdown('<div class="metric-kpi">CARGAR CERTIFICADO</div>', unsafe_allow_html=True)
     archivo_subido = st.file_uploader(
         "Certificado",
         type="xlsx",
@@ -268,7 +282,7 @@ with col_upload:
         """)
 
 with col_info:
-    st.markdown('<div style="font-size:0.65rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:8px;">REFERENCIA RÁPIDA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="metric-kpi">REFERENCIA RÁPIDA</div>', unsafe_allow_html=True)
     norma_data = NORMAS[norma_seleccionada]
     ref_rows = []
     for elem, vals in norma_data.items():
@@ -331,7 +345,7 @@ if archivo_subido is not None:
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
         # Tabla con colores
-        st.markdown('<div style="font-size:0.65rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:8px;">DETALLE POR ELEMENTO</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-kpi">DETALLE POR ELEMENTO</div>', unsafe_allow_html=True)
 
         def color_resultado(val):
             if val == "APROBADO":
