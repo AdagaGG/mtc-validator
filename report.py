@@ -34,6 +34,7 @@ def generate_pdf(df_resultado, norma_key, veredicto, empresa="", archivo="") -> 
     # ── PAGE 1 — COVER ───────────────────────────────────────────────────────────
     # Header bar
     pdf.set_fill_color(13, 28, 24)  # #0d1218
+    pdf.set_font("Courier", "", 12)  # Set default font before using cell
     pdf.cell(210, 25, "", fill=True, ln=True)
     
     pdf.set_text_color(0, 212, 160)  # #00d4a0 accent green
