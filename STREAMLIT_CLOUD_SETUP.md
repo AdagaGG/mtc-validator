@@ -16,33 +16,27 @@ Cuando desployes tu app en Streamlit Cloud, necesitas configurar las credenciale
 
 3. **Agrega Secrets**
    - Click en "Secrets" en la barra lateral izquierda
-   - Agrega el siguiente contenido en formato TOML:
+   - Agrega el siguiente contenido en formato TOML (consulta `.streamlit/secrets.toml.example` para la estructura completa):
 
 ```toml
 [credentials]
 [credentials.usernames]
 
-[credentials.usernames.piloto_empresa1]
-email = "contacto@empresa1.com"
-first_name = "Piloto"
-last_name = "Empresa1"
-password = "piloto2024"
+[credentials.usernames.username1]
+email = "user1@example.com"
+first_name = "User"
+last_name = "One"
+password = "your_secure_password"
 
 [credentials.usernames.admin]
-email = "hola@adaga.tech"
-first_name = "Adrian"
-last_name = "Admin"
-password = "admin2024"
-
-[credentials.usernames.tester]
-email = "test@mtcvalidator.com"
-first_name = "Test"
+email = "admin@example.com"
+first_name = "Admin"
 last_name = "User"
-password = "test2024"
+password = "your_admin_password"
 
 [cookie]
 expiry_days = 30
-key = "mtc_validator_secret_key_2024"
+key = "your_secret_key_change_this"
 name = "mtc_validator_auth"
 
 [[pre-authorized]]

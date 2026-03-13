@@ -203,23 +203,23 @@ SETUP:
 2. Create a file called config.yaml in the project root with this structure:
 credentials:
   usernames:
-    piloto_empresa1:
-      email: contacto@empresa1.com
-      first_name: Piloto
-      last_name: Empresa1
-      password: piloto2024  # Will be auto-hashed
+    username1:
+      email: user1@example.com
+      first_name: User
+      last_name: One
+      password: securepassword123  # Will be auto-hashed
       roles:
         - viewer
     admin:
-      email: hola@adaga.tech
-      first_name: Adrian
-      last_name: Admin
-      password: admin2024  # Will be hashed
+      email: admin@example.com
+      first_name: Admin
+      last_name: User
+      password: adminpassword456  # Will be hashed
       roles:
         - admin
 cookie:
   expiry_days: 30
-  key: mtc_validator_secret_key_2024
+  key: your_secret_key_here
   name: mtc_validator_auth
 
 3. In app.py, add authentication BEFORE any other content:

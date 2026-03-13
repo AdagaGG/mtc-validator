@@ -51,37 +51,18 @@ def load_config():
         2. Click en el botón **Deploy** o en el nombre de la app
         3. Click en **Settings** (ícono de engranaje) en la esquina superior derecha
         4. Click en **Secrets** en la barra lateral
-        5. Agrega tus credenciales en formato TOML exactamente así:
-        
-        ```toml
-        [credentials]
-        [credentials.usernames]
-        
-        [credentials.usernames.piloto_empresa1]
-        email = "contacto@empresa1.com"
-        first_name = "Piloto"
-        last_name = "Empresa1"
-        password = "piloto2024"
-        
-        [credentials.usernames.admin]
-        email = "hola@adaga.tech"
-        first_name = "Adrian"
-        last_name = "Admin"
-        password = "admin2024"
-        
-        [cookie]
-        expiry_days = 30
-        key = "mtc_validator_secret_key_2024"
-        name = "mtc_validator_auth"
-        ```
-        
-        6. Click **Save**
-        7. Streamlit Cloud automáticamente reiniciará tu app
+        5. Copia el contenido de `.streamlit/secrets.toml.example` desde el repositorio
+        6. Pégalo en el campo de Secrets y actualiza con tus credenciales reales
+        7. Click **Save**
+        8. Streamlit Cloud automáticamente reiniciará tu app
         
         **Para desarrollo local:**
-        1. Crea un archivo `config.yaml` en la raíz del proyecto
-        2. Copia el contenido de `config.yaml.example`
-        3. Actualiza con tus credenciales
+        1. Copia `.streamlit/secrets.toml.example` a `.streamlit/secrets.toml`
+        2. O copia `config.yaml.example` a `config.yaml`
+        3. Actualiza con tus credenciales reales (nunca commits al repo)
+        
+        **⚠️ IMPORTANTE:** Nunca commits `config.yaml` o `.streamlit/secrets.toml` 
+        con credenciales reales al repositorio. Están en `.gitignore` por seguridad.
         """)
         st.stop()
     except Exception as e:
