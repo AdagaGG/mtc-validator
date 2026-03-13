@@ -1,9 +1,13 @@
 """
-Normas de tolerancias para elementos metalúrgicos según estándares ASTM/SAE
+MTC Validator — Normas metalúrgicas ASTM/SAE/DIN/API/NMX
+Tolerancias para elementos química y propiedades mecánicas
 """
 
 NORMAS = {
+    # ── SAE STANDARDS ────────────────────────────────────────────────────────
     "SAE1020": {
+        "label": "SAE 1020 — Acero Bajo Carbono",
+        "descripcion": "Aceros de bajo carbono para aplicaciones generales de construcción",
         "C_%": {"min": 0.18, "max": 0.23},
         "Mn_%": {"min": 0.30, "max": 0.55},
         "P_%": {"min": 0.0, "max": 0.04},
@@ -13,6 +17,8 @@ NORMAS = {
         "Elong_%": {"min": 25, "max": 100},
     },
     "SAE1045": {
+        "label": "SAE 1045 — Acero Medio Carbono",
+        "descripcion": "Aceros de medio carbono para ejes, engranajes y componentes de alta resistencia",
         "C_%": {"min": 0.43, "max": 0.50},
         "Mn_%": {"min": 0.60, "max": 0.90},
         "P_%": {"min": 0.0, "max": 0.04},
@@ -21,7 +27,11 @@ NORMAS = {
         "UTS_MPa": {"min": 570, "max": 700},
         "Elong_%": {"min": 16, "max": 100},
     },
+    
+    # ── ASTM STANDARDS ───────────────────────────────────────────────────────
     "ASTM_A36": {
+        "label": "ASTM A36 — Acero Estructural Carbono",
+        "descripcion": "Acero estructural general para vigas, columnas y placas en construcción",
         "C_%": {"min": 0.0, "max": 0.26},
         "Mn_%": {"min": 0.0, "max": 1.03},
         "P_%": {"min": 0.0, "max": 0.04},
@@ -30,13 +40,125 @@ NORMAS = {
         "UTS_MPa": {"min": 400, "max": 550},
         "Elong_%": {"min": 20, "max": 100},
     },
+    "ASTM_A572_Gr50": {
+        "label": "ASTM A572 Grado 50 — Acero Estructural Alta Resistencia",
+        "descripcion": "Acero HSLA para vigas, columnas, placas estructurales en construcción y puentes",
+        "C_%": {"min": 0.0, "max": 0.23},
+        "Mn_%": {"min": 0.80, "max": 1.35},
+        "P_%": {"min": 0.0, "max": 0.04},
+        "S_%": {"min": 0.0, "max": 0.05},
+        "Si_%": {"min": 0.0, "max": 0.40},
+        "YS_MPa": {"min": 345, "max": 500},
+        "UTS_MPa": {"min": 450, "max": 630},
+        "Elong_%": {"min": 18, "max": 100},
+    },
+    "ASTM_A992": {
+        "label": "ASTM A992 — Acero para Perfiles Estructurales",
+        "descripcion": "Acero estructural para vigas W, canales y ángulos en construcción",
+        "C_%": {"min": 0.0, "max": 0.23},
+        "Mn_%": {"min": 0.0, "max": 1.35},
+        "P_%": {"min": 0.0, "max": 0.035},
+        "S_%": {"min": 0.0, "max": 0.04},
+        "Si_%": {"min": 0.0, "max": 0.40},
+        "YS_MPa": {"min": 290, "max": 450},
+        "UTS_MPa": {"min": 400, "max": 550},
+        "Elong_%": {"min": 18, "max": 100},
+    },
+    "ASTM_A516_Gr70": {
+        "label": "ASTM A516 Grado 70 — Acero para Recipientes a Presión",
+        "descripcion": "Acero de carbono para calderas, tanques de presión y recipientes de endurecimiento",
+        "C_%": {"min": 0.0, "max": 0.27},
+        "Mn_%": {"min": 0.24, "max": 0.85},
+        "P_%": {"min": 0.0, "max": 0.035},
+        "S_%": {"min": 0.0, "max": 0.04},
+        "Si_%": {"min": 0.13, "max": 0.32},
+        "YS_MPa": {"min": 260, "max": 380},
+        "UTS_MPa": {"min": 485, "max": 620},
+        "Elong_%": {"min": 19, "max": 100},
+    },
+    "ASTM_A193_B7": {
+        "label": "ASTM A193 B7 — Acero Aleado para Pernería",
+        "descripcion": "Pernos de aleación cromo-molibdeno para temperaturas extremas",
+        "C_%": {"min": 0.38, "max": 0.48},
+        "Mn_%": {"min": 0.60, "max": 0.90},
+        "P_%": {"min": 0.0, "max": 0.035},
+        "S_%": {"min": 0.0, "max": 0.04},
+        "Si_%": {"min": 0.20, "max": 0.35},
+        "Cr_%": {"min": 0.80, "max": 1.10},
+        "Mo_%": {"min": 0.15, "max": 0.25},
+        "YS_MPa": {"min": 725, "max": 900},
+        "UTS_MPa": {"min": 860, "max": 1035},
+        "Elong_%": {"min": 12, "max": 100},
+    },
+    
+    # ── AISI STANDARDS ───────────────────────────────────────────────────────
     "AISI4140": {
+        "label": "AISI 4140 — Acero Aleado Cromo-Molibdeno",
+        "descripcion": "Acero aleado de alta resistencia para ejes, engranajes y componentes críticos",
         "C_%": {"min": 0.38, "max": 0.43},
         "Mn_%": {"min": 0.75, "max": 1.00},
         "P_%": {"min": 0.0, "max": 0.035},
         "S_%": {"min": 0.0, "max": 0.040},
+        "Si_%": {"min": 0.20, "max": 0.35},
+        "Cr_%": {"min": 0.80, "max": 1.10},
+        "Mo_%": {"min": 0.15, "max": 0.25},
         "YS_MPa": {"min": 415, "max": 550},
         "UTS_MPa": {"min": 655, "max": 860},
         "Elong_%": {"min": 16, "max": 100},
+    },
+    
+    # ── API STANDARDS ────────────────────────────────────────────────────────
+    "API_5L_X42": {
+        "label": "API 5L X42 — Acero para Tuberías de Línea",
+        "descripcion": "Acero de carbono para tuberías de transmisión de petróleo y gas",
+        "C_%": {"min": 0.0, "max": 0.28},
+        "Mn_%": {"min": 0.0, "max": 1.30},
+        "P_%": {"min": 0.0, "max": 0.030},
+        "S_%": {"min": 0.0, "max": 0.03},
+        "Si_%": {"min": 0.0, "max": 0.40},
+        "YS_MPa": {"min": 290, "max": 495},
+        "UTS_MPa": {"min": 415, "max": 520},
+        "Elong_%": {"min": 24, "max": 100},
+    },
+    
+    # ── DIN/EN STANDARDS ─────────────────────────────────────────────────────
+    "DIN_17200_Ck45": {
+        "label": "DIN 17200 Ck45 — Acero Medio Carbono Alemán",
+        "descripcion": "Equivalente europeo a SAE 1045 para ejes y componentes mecánicos",
+        "C_%": {"min": 0.42, "max": 0.50},
+        "Mn_%": {"min": 0.50, "max": 0.80},
+        "P_%": {"min": 0.0, "max": 0.045},
+        "S_%": {"min": 0.0, "max": 0.045},
+        "Si_%": {"min": 0.15, "max": 0.35},
+        "YS_MPa": {"min": 295, "max": 380},
+        "UTS_MPa": {"min": 540, "max": 680},
+        "Elong_%": {"min": 16, "max": 100},
+    },
+    "EN_10083_42CrMo4": {
+        "label": "EN 10083 42CrMo4 — Acero Aleado Europeo",
+        "descripcion": "Equivalente europeo a AISI 4140 para aplicaciones de alta precisión",
+        "C_%": {"min": 0.38, "max": 0.45},
+        "Mn_%": {"min": 0.60, "max": 0.85},
+        "P_%": {"min": 0.0, "max": 0.035},
+        "S_%": {"min": 0.0, "max": 0.035},
+        "Si_%": {"min": 0.15, "max": 0.30},
+        "Cr_%": {"min": 0.90, "max": 1.20},
+        "Mo_%": {"min": 0.15, "max": 0.30},
+        "YS_MPa": {"min": 400, "max": 550},
+        "UTS_MPa": {"min": 650, "max": 850},
+        "Elong_%": {"min": 16, "max": 100},
+    },
+    
+    # ── NMX STANDARDS ────────────────────────────────────────────────────────
+    "NMX_B_172": {
+        "label": "NMX-B-172 — Acero Carbono para Barras",
+        "descripcion": "Norma mexicana para barras de acero de carbono (equivalente a SAE 1020)",
+        "C_%": {"min": 0.18, "max": 0.23},
+        "Mn_%": {"min": 0.30, "max": 0.55},
+        "P_%": {"min": 0.0, "max": 0.04},
+        "S_%": {"min": 0.0, "max": 0.05},
+        "YS_MPa": {"min": 295, "max": 380},
+        "UTS_MPa": {"min": 435, "max": 565},
+        "Elong_%": {"min": 25, "max": 100},
     },
 }
