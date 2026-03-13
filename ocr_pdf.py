@@ -12,6 +12,12 @@ import requests
 import json
 import base64
 import streamlit as st
+from PIL import Image
+try:
+    import fitz  # PyMuPDF
+    HAS_PYMUPDF = True
+except ImportError:
+    HAS_PYMUPDF = False
 
 
 # ===== ALIASES DICT (tested and working) =====
@@ -182,28 +188,51 @@ def _extract_mistral(pdf_bytes: bytes) -> pd.DataFrame:
     Fallback OCR using Mistral Pixtral API for scanned PDFs.
     Only called if pdfplumber returns fewer than 3 elements.
     Requires MISTRAL_API_KEY in st.secrets.
+    Converts PDF to image (PNG) before sending to Mistral using PyMuPDF + PIL.
     """
     api_key = st.secrets.get("MISTRAL_API_KEY", None)
     if not api_key:
         return pd.DataFrame(columns=['elemento', 'valor'])
 
+    if not HAS_PYMUPDF:
+        print("Warning: PyMuPDF not installed, Mistral OCR unavailable")
+        return pd.DataFrame(columns=['elemento', 'valor'])
+
     try:
-        b64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        # Convert PDF to image using PyMuPDF + PIL for robust JPEG encoding
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if len(doc) < 1:
+            return pd.DataFrame(columns=['elemento', 'valor'])
+        
+        # Render first page to image
+        page = doc[0]
+        pix = page.get_pixmap(matrix=fitz.Matrix(1, 1))  # 1x zoom (original size)
+        
+        # Convert PyMuPDF pixmap to PIL Image
+        img_data = pix.tobytes("ppm")
+        img = Image.open(io.BytesIO(img_data))
+        
+        # Resize to max 800x800
+        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+        
+        # Convert to JPEG with low quality for smallest size
+        img_byte_arr = io.BytesIO()
+        img = img.convert('RGB')  # Ensure RGB for JPEG
+        img.save(img_byte_arr, format='JPEG', quality=60, optimize=True)
+        img_byte_arr.seek(0)
+        img_b64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+        
         payload = {
-            "model": "pixtral-12b-2409",
+            "model": "pixtral-12b",
             "max_tokens": 1000,
             "messages": [{
                 "role": "user",
                 "content": [
                     {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:application/pdf;base64,{b64}"}
-                    },
-                    {
                         "type": "text",
                         "text": (
                             "Extract all chemical composition values and mechanical properties "
-                            "from this Mill Test Certificate. "
+                            "from this Mill Test Certificate image. "
                             "Return ONLY a valid JSON array, no markdown, no explanation. "
                             "Format: [{\"elemento\": \"C_%\", \"valor\": 0.22}] "
                             "Use ONLY these element names: "
@@ -212,6 +241,10 @@ def _extract_mistral(pdf_bytes: bytes) -> pd.DataFrame:
                             "YS_MPa, UTS_MPa, Elong_% "
                             "Skip elements with value '-' or missing."
                         )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
                     }
                 ]
             }]
@@ -230,6 +263,8 @@ def _extract_mistral(pdf_bytes: bytes) -> pd.DataFrame:
         return pd.DataFrame(data)
     except Exception as e:
         print(f"Error in _extract_mistral: {e}")
+        import traceback
+        traceback.print_exc()
         return pd.DataFrame(columns=['elemento', 'valor'])
 
 
