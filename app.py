@@ -62,7 +62,14 @@ except Exception as e:
     st.stop()
 
 # Show login form
-name, authentication_status, username = authenticator.login("main", "sidebar")
+login_result = authenticator.login("main", "sidebar")
+
+# Handle login result safely
+if login_result is None:
+    st.error("❌ Authentication system error. Please refresh the page.")
+    st.stop()
+
+name, authentication_status, username = login_result
 
 if authentication_status is False:
     st.error("❌ Usuario o contraseña incorrectos. Intenta de nuevo.")
