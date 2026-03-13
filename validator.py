@@ -69,6 +69,8 @@ def normalize_element_name(name: str) -> str:
     Convierte cualquier variante de nombre a nombre canónico.
     Retorna el nombre original si no encuentra alias.
     """
+    if name is None or name == "":
+        return ""
     if name in CANONICAL:
         return name
     lookup = name.strip().lower()

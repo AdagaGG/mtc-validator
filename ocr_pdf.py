@@ -65,7 +65,9 @@ def extract_with_pdfplumber(pdf_bytes: bytes) -> pd.DataFrame:
                                 
                                 # Check if row contains element name and numeric value
                                 for elem_name, pattern in element_patterns.items():
-                                    if re.search(elem_name.lower(), elem_cell) or re.search(pattern, " ".join(str(c) for c in row)):
+                                    # Filter out None values and convert to strings
+                                    row_str = " ".join(str(c).strip() for c in row if c is not None)
+                                    if re.search(elem_name.lower(), elem_cell) or re.search(pattern, row_str):
                                         try:
                                             # Try to extract value
                                             match = re.search(r"([\d.]+)", val_cell)

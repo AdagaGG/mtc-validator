@@ -60,9 +60,9 @@ def save_validacion(usuario, norma, archivo, df_resultado, veredicto, metodo):
         n_aprobado = (df_resultado["resultado"] == "APROBADO").sum()
         n_rechazado = (df_resultado["resultado"] == "RECHAZADO").sum()
         
-        elementos_fallidos = ",".join(
-            df_resultado[df_resultado["resultado"] == "RECHAZADO"]["elemento"].tolist()
-        )
+        # Filter out None values and convert to strings
+        elementos_fallidos_list = df_resultado[df_resultado["resultado"] == "RECHAZADO"]["elemento"].tolist()
+        elementos_fallidos = ",".join([str(e).strip() for e in elementos_fallidos_list if e is not None])
         
         fecha = datetime.now().isoformat()
         

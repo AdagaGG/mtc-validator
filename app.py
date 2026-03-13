@@ -368,6 +368,8 @@ with tab_validador:
 
             if hay_rechazos:
                 fallas = df_resultado[df_resultado["resultado"] == "RECHAZADO"]["elemento"].tolist()
+                # Filter out None values and convert to strings
+                fallas = [str(f).strip() for f in fallas if f is not None]
                 subtexto = f"{n_rechazado} parámetro(s) fuera · {', '.join(fallas)}"
                 st.markdown(verdict_banner(veredicto, subtexto, "fail"), unsafe_allow_html=True)
             else:
@@ -376,6 +378,8 @@ with tab_validador:
 
             if n_no_norma > 0:
                 elementos_extra = df_resultado[df_resultado["resultado"] == "NO EN NORMA"]["elemento"].tolist()
+                # Filter out None values and convert to strings
+                elementos_extra = [str(e).strip() for e in elementos_extra if e is not None]
                 st.warning(f"⚠️ {n_no_norma} elemento(s) no en norma: {', '.join(elementos_extra)}")
 
             if n_sin_valor > 0:
