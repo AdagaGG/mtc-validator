@@ -1,0 +1,28 @@
+# MTC Validator Configuration
+# Copy this file to config.yaml and update credentials for local development
+# DO NOT commit config.yaml with real passwords to version control
+
+credentials:
+  usernames:
+    piloto_empresa1:
+      email: contacto@empresa1.com
+      first_name: Piloto
+      last_name: Empresa1
+      password: piloto2024
+    admin:
+      email: hola@adaga.tech
+      first_name: Adrian
+      last_name: Admin
+      password: admin2024
+    tester:
+      email: test@mtcvalidator.com
+      first_name: Test
+      last_name: User
+      password: test2024
+
+cookie:
+  expiry_days: 30
+  key: mtc_validator_secret_key_2024
+  name: mtc_validator_auth
+
+pre-authorized: []

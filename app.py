@@ -24,15 +24,49 @@ st.set_page_config(
 
 # ── AUTHENTICATION ───────────────────────────────────────────────────────────
 def load_config():
-    """Load YAML config"""
+    """Load config from Streamlit Secrets (Cloud) or config.yaml (Local)"""
+    try:
+        # Try Streamlit Secrets first (Streamlit Cloud)
+        if 'credentials' in st.secrets:
+            return st.secrets.to_dict()
+    except:
+        pass
+    
+    # Fallback to local config.yaml
     try:
         with open("config.yaml") as config_file:
             config = yaml.load(config_file, Loader=SafeLoader)
             if not config or 'credentials' not in config:
                 raise ValueError("Invalid YAML structure: missing 'credentials' key")
             return config
+    except FileNotFoundError:
+        st.error("""
+        ❌ **Configuration not found!**
+        
+        **Para Streamlit Cloud:**
+        1. Abre el dashboard de tu app en Streamlit Cloud
+        2. Ve a Settings → Secrets
+        3. Agrega tus credenciales en formato TOML:
+        
+        ```toml
+        [credentials.usernames.piloto_empresa1]
+        email = "contacto@empresa1.com"
+        first_name = "Piloto"
+        last_name = "Empresa1"
+        password = "piloto2024"
+        
+        [cookie]
+        expiry_days = 30
+        key = "mtc_validator_secret_key_2024"
+        name = "mtc_validator_auth"
+        ```
+        
+        **Para desarrollo local:**
+        Crea un archivo `config.yaml` en la raíz del proyecto.
+        """)
+        st.stop()
     except Exception as e:
-        st.error(f"❌ Error loading config.yaml: {str(e)}")
+        st.error(f"❌ Error loading config: {str(e)}")
         st.stop()
 
 def verify_credentials(username: str, password: str, config: dict) -> dict:
