@@ -543,5 +543,5 @@ with tab_config:
     - 🔐 Sistema de autenticación multi-usuario
     
     **Desarrollado por:** Adrian García · IMT FIME UANL  
-    **Contacto:** adaga.tech
+    **Contacto:** adrian.garcia.garavito@gmail.com
     """)
