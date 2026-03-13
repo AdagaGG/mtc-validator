@@ -25,11 +25,14 @@ st.set_page_config(
 # ── AUTHENTICATION ───────────────────────────────────────────────────────────
 def load_config():
     """Load config from Streamlit Secrets (Cloud) or config.yaml (Local)"""
+    
+    # Try Streamlit Secrets first (Streamlit Cloud)
     try:
-        # Try Streamlit Secrets first (Streamlit Cloud)
         if 'credentials' in st.secrets:
-            return st.secrets.to_dict()
-    except:
+            secrets_dict = st.secrets.to_dict()
+            if 'credentials' in secrets_dict and 'usernames' in secrets_dict.get('credentials', {}):
+                return secrets_dict
+    except Exception:
         pass
     
     # Fallback to local config.yaml
@@ -45,15 +48,26 @@ def load_config():
         
         **Para Streamlit Cloud:**
         1. Abre el dashboard de tu app en Streamlit Cloud
-        2. Ve a Settings → Secrets
-        3. Agrega tus credenciales en formato TOML:
+        2. Click en el botón **Deploy** o en el nombre de la app
+        3. Click en **Settings** (ícono de engranaje) en la esquina superior derecha
+        4. Click en **Secrets** en la barra lateral
+        5. Agrega tus credenciales en formato TOML exactamente así:
         
         ```toml
+        [credentials]
+        [credentials.usernames]
+        
         [credentials.usernames.piloto_empresa1]
         email = "contacto@empresa1.com"
         first_name = "Piloto"
         last_name = "Empresa1"
         password = "piloto2024"
+        
+        [credentials.usernames.admin]
+        email = "hola@adaga.tech"
+        first_name = "Adrian"
+        last_name = "Admin"
+        password = "admin2024"
         
         [cookie]
         expiry_days = 30
@@ -61,8 +75,13 @@ def load_config():
         name = "mtc_validator_auth"
         ```
         
+        6. Click **Save**
+        7. Streamlit Cloud automáticamente reiniciará tu app
+        
         **Para desarrollo local:**
-        Crea un archivo `config.yaml` en la raíz del proyecto.
+        1. Crea un archivo `config.yaml` en la raíz del proyecto
+        2. Copia el contenido de `config.yaml.example`
+        3. Actualiza con tus credenciales
         """)
         st.stop()
     except Exception as e:
