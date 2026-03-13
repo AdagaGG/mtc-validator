@@ -1,11 +1,13 @@
 """
-MTC Validator — Rediseño Industrial Precision
+MTC Validator — app.py (Bulletproof Edition)
+UI a prueba de errores del usuario.
 """
 
 import streamlit as st
 import pandas as pd
+import io
 from normas import NORMAS
-from validator import validate_mtc
+from validator import validate_mtc, clean_dataframe, detect_norma
 from report import generate_pdf
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -16,157 +18,97 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── CSS Global — PRIMERO ───────────────────────────────────────────────────────
+# ── CSS ──────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap');
-
 :root {
-  --bg: #080c10;
-  --surface: #0d1218;
-  --surface2: #111820;
-  --border: #1e2835;
-  --border2: #263040;
-  --accent: #00d4a0;
-  --accent2: #00a37a;
-  --accent-glow: rgba(0,212,160,0.08);
-  --red: #ff4d6a;
-  --red-dim: rgba(255,77,106,0.10);
-  --text: #c8d8e8;
-  --muted: #4a6070;
-  --muted2: #6a8090;
-  --mono: 'JetBrains Mono', monospace;
-  --display: 'Syne', sans-serif;
+  --accent: #00d4a0; --red: #ff4d6a; --yellow: #f5a623;
+  --surface: #0d1218; --border: #1e2835;
+  --mono: 'JetBrains Mono', monospace; --display: 'Syne', sans-serif;
 }
-
-/* Reset Streamlit defaults */
 html, body, [class*="css"] { font-family: var(--mono) !important; }
 .main .block-container { padding: 1.5rem 2rem 2rem !important; max-width: 100% !important; }
 header[data-testid="stHeader"] { background: #0d1218 !important; border-bottom: 1px solid #1e2835; }
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-  background: #0d1218 !important;
-  border-right: 1px solid #1e2835 !important;
-}
+section[data-testid="stSidebar"] { background: #0d1218 !important; border-right: 1px solid #1e2835 !important; }
 section[data-testid="stSidebar"] > div { background: #0d1218 !important; }
-
-/* Selectbox */
 div[data-baseweb="select"] > div {
-  background: #080c10 !important;
-  border: 1px solid #263040 !important;
-  border-radius: 4px !important;
-  font-family: var(--mono) !important;
-  color: #00d4a0 !important;
+  background: #080c10 !important; border: 1px solid #263040 !important;
+  border-radius: 4px !important; font-family: var(--mono) !important; color: #00d4a0 !important;
 }
-
-/* File uploader */
-[data-testid="stFileUploader"] {
-  background: #0d1218 !important;
-  border: 1px dashed #263040 !important;
-  border-radius: 8px !important;
-  padding: 1rem !important;
-}
-[data-testid="stFileUploader"]:hover {
-  border-color: #00a37a !important;
-}
-
-/* Buttons */
-.stDownloadButton > button, .stButton > button {
-  background: #00d4a0 !important;
-  color: #080c10 !important;
-  border: none !important;
-  border-radius: 4px !important;
-  font-family: var(--mono) !important;
-  font-weight: 600 !important;
-  font-size: 0.8rem !important;
-  letter-spacing: 0.06em !important;
-  padding: 0.5rem 1.2rem !important;
-  transition: opacity 0.15s !important;
-}
-.stDownloadButton > button:hover, .stButton > button:hover {
-  opacity: 0.85 !important;
-  background: #00d4a0 !important;
-}
-
-/* Metrics */
 [data-testid="metric-container"] {
-  background: #111820 !important;
-  border: 1px solid #1e2835 !important;
-  border-radius: 6px !important;
-  padding: 0.75rem 1rem !important;
+  background: #111820 !important; border: 1px solid #1e2835 !important;
+  border-radius: 6px !important; padding: 0.75rem 1rem !important;
 }
-[data-testid="metric-container"] label {
-  font-size: 0.65rem !important;
-  letter-spacing: 0.1em !important;
-  color: #4a6070 !important;
+[data-testid="metric-container"] label { font-size: 0.65rem !important; letter-spacing: 0.1em !important; color: #4a6070 !important; }
+[data-testid="metric-container"] [data-testid="stMetricValue"] { color: #00d4a0 !important; font-size: 1.4rem !important; font-weight: 600 !important; }
+.stDownloadButton > button, .stButton > button {
+  background: #00d4a0 !important; color: #080c10 !important; border: none !important;
+  border-radius: 4px !important; font-family: var(--mono) !important;
+  font-weight: 600 !important; font-size: 0.8rem !important; letter-spacing: 0.06em !important;
 }
-[data-testid="metric-container"] [data-testid="stMetricValue"] {
-  color: #00d4a0 !important;
-  font-size: 1.4rem !important;
-  font-weight: 600 !important;
-}
-
-/* Dataframe */
-[data-testid="stDataFrame"] {
-  border: 1px solid #1e2835 !important;
-  border-radius: 6px !important;
-  overflow: hidden !important;
-}
-
-/* Expander */
-details {
-  background: #0d1218 !important;
-  border: 1px solid #1e2835 !important;
-  border-radius: 6px !important;
-}
-
-/* Info / error / success boxes */
-[data-testid="stAlert"] {
-  border-radius: 6px !important;
-  font-family: var(--mono) !important;
-  font-size: 0.8rem !important;
-}
-
-/* Divider */
+[data-testid="stDataFrame"] { border: 1px solid #1e2835 !important; border-radius: 6px !important; }
 hr { border-color: #1e2835 !important; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: #080c10; }
-::-webkit-scrollbar-thumb { background: #263040; border-radius: 2px; }
-
-/* Custom classes */
-.logo-header {
-  margin-bottom: 1.5rem;
-}
-.section-title {
-  margin-bottom: 1rem;
-}
-.metric-kpi {
-  font-size: 0.65rem;
-  color: #4a6070;
-  letter-spacing: 0.1em;
-  margin-bottom: 8px;
-}
-.verdict-banner {
-  border-radius: 6px;
-  padding: 14px 18px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 1rem;
-}
-.verdict-pass {
-  background: rgba(0,212,160,0.07);
-  border: 1px solid rgba(0,212,160,0.3);
-}
-.verdict-fail {
-  background: rgba(255,77,106,0.10);
-  border: 1px solid rgba(255,77,106,0.3);
-}
+::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: #263040; border-radius: 2px; }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def verdict_banner(texto, subtexto, tipo="pass"):
+    cfg = {
+        "pass":    ("#00d4a0", "rgba(0,212,160,0.07)",  "rgba(0,212,160,0.3)",  "0 0 8px rgba(0,212,160,0.5)"),
+        "fail":    ("#ff4d6a", "rgba(255,77,106,0.10)", "rgba(255,77,106,0.3)", "0 0 8px rgba(255,77,106,0.5)"),
+        "warning": ("#f5a623", "rgba(245,166,35,0.08)", "rgba(245,166,35,0.3)", "0 0 8px rgba(245,166,35,0.5)"),
+    }
+    color, bg, border, shadow = cfg.get(tipo, cfg["pass"])
+    return f"""
+    <div style="background:{bg};border:1px solid {border};border-radius:6px;
+                padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:1rem;">
+      <div style="width:10px;height:10px;border-radius:50%;background:{color};
+                  box-shadow:{shadow};flex-shrink:0;"></div>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:700;color:{color};">
+          {texto}
+        </div>
+        <div style="font-size:0.7rem;color:#6a8090;margin-top:2px;">{subtexto}</div>
+      </div>
+    </div>"""
+
+
+def generate_template(norma_key: str) -> bytes:
+    """Genera Excel plantilla descargable con los elementos de la norma seleccionada."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "MTC"
+    ws.column_dimensions["A"].width = 16
+    ws.column_dimensions["B"].width = 14
+    ws.column_dimensions["C"].width = 30
+
+    # Headers
+    for col, val in [("A1", "elemento"), ("B1", "valor"), ("C1", "referencia")]:
+        ws[col] = val
+        ws[col].font = Font(bold=True, color="00D4A0", name="Courier New")
+        ws[col].fill = PatternFill("solid", start_color="0D1218")
+        ws[col].alignment = Alignment(horizontal="center")
+
+    # Filas con elementos de la norma
+    norma = NORMAS[norma_key]
+    for i, (elem, limits) in enumerate(norma.items(), start=2):
+        ws[f"A{i}"] = elem
+        ws[f"B{i}"] = ""  # El usuario llena aquí
+        ws[f"C{i}"] = f"Min: {limits['min']} | Max: {limits['max']}"
+        ws[f"A{i}"].font = Font(name="Courier New", size=10)
+        ws[f"B{i}"].font = Font(name="Courier New", size=10, bold=True)
+        ws[f"C{i}"].font = Font(name="Courier New", size=9, color="4A6070")
+        ws[f"B{i}"].alignment = Alignment(horizontal="right")
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 # ── Helpers HTML ─────────────────────────────────────────────────────────────
@@ -221,146 +163,202 @@ def verdict_banner(texto, subtexto, tipo="pass"):
     """
 
 
-# ── Sidebar ──────────────────────────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown(logo_header(), unsafe_allow_html=True)
-    st.markdown('<div class="metric-kpi">NORMA ACTIVA</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="margin-bottom:1.5rem;">
+      <div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.12em;margin-bottom:4px;">&gt; SISTEMA ACTIVO</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:#00d4a0;line-height:1;letter-spacing:-0.02em;">MTC<br>Validator</div>
+      <div style="font-size:0.6rem;color:#4a6070;margin-top:4px;letter-spacing:0.06em;">ASTM / SAE / NMX — v0.2</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:6px;">NORMA A VALIDAR</div>', unsafe_allow_html=True)
 
     norma_seleccionada = st.selectbox(
-        "Norma",
-        options=list(NORMAS.keys()),
-        index=1,
-        label_visibility="collapsed"
+        "Norma", options=list(NORMAS.keys()), index=0, label_visibility="collapsed"
     )
 
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
+    # Métricas
     col_a, col_b = st.columns(2)
     with col_a:
         st.metric("ELEMENTOS", len(NORMAS[norma_seleccionada]))
     with col_b:
-        st.metric("NORMA", norma_seleccionada.replace("ASTM_", "").replace("AISI", ""))
+        st.metric("VERSIÓN", "0.2")
 
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-    st.markdown(
-        '<div style="font-size:0.6rem;color:#263040;letter-spacing:0.06em;padding-top:8px;'
-        'border-top:1px solid #1e2835;">adaga.tech · IMT FIME UANL</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-
-# ── Main Layout ──────────────────────────────────────────────────────────────
-st.markdown(section_title("Validador de Certificados MTC", "Normas ASTM / SAE — Control de Calidad Metalúrgico"), unsafe_allow_html=True)
-
-col_upload, col_info = st.columns([2, 1], gap="large")
-
-with col_upload:
-    st.markdown('<div class="metric-kpi">CARGAR CERTIFICADO</div>', unsafe_allow_html=True)
-    archivo_subido = st.file_uploader(
-        "Certificado",
-        type="xlsx",
-        help="Columnas requeridas: 'elemento' y 'valor'. Sin celdas combinadas.",
-        label_visibility="collapsed"
-    )
-
-    with st.expander("📋  Ver formato esperado del Excel"):
-        st.markdown("""
-        | elemento | valor |
-        |----------|-------|
-        | C_% | 0.46 |
-        | Mn_% | 0.85 |
-        | P_% | 0.018 |
-        | S_% | 0.022 |
-        | YS_MPa | 350 |
-        | UTS_MPa | 610 |
-        | Elong_% | 18.5 |
-
-        **Reglas estrictas:**
-        - Columna A: nombre exacto del elemento (sensible a mayúsculas)
-        - Columna B: valor numérico decimal
-        - Sin celdas combinadas · Sin logos · Sin colores de celda
-        """)
-
-with col_info:
-    st.markdown('<div class="metric-kpi">REFERENCIA RÁPIDA</div>', unsafe_allow_html=True)
-    norma_data = NORMAS[norma_seleccionada]
-    ref_rows = []
-    for elem, vals in norma_data.items():
-        ref_rows.append({"Elemento": elem, "Mín": vals["min"], "Máx": vals["max"]})
-    st.dataframe(
-        pd.DataFrame(ref_rows),
-        hide_index=True,
+    # Plantilla descargable
+    st.markdown('<div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:6px;">PLANTILLA EXCEL</div>', unsafe_allow_html=True)
+    template_bytes = generate_template(norma_seleccionada)
+    st.download_button(
+        label="↓ Descargar Plantilla",
+        data=template_bytes,
+        file_name=f"plantilla_mtc_{norma_seleccionada}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
-        height=280
+        help="Descarga la plantilla con los elementos de esta norma. Solo llena la columna 'valor'."
     )
 
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-# ── Processing ───────────────────────────────────────────────────────────────
+    # Tabla de referencia de tolerancias
+    st.markdown('<div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:6px;">TOLERANCIAS — ' + norma_seleccionada + '</div>', unsafe_allow_html=True)
+    ref_data = [{"Elemento": k, "Mín": v["min"], "Máx": v["max"]} for k, v in NORMAS[norma_seleccionada].items()]
+    st.dataframe(pd.DataFrame(ref_data), hide_index=True, use_container_width=True, height=250)
+
+    st.markdown('<div style="font-size:0.6rem;color:#263040;letter-spacing:0.06em;padding-top:8px;border-top:1px solid #1e2835;">adaga.tech · IMT FIME UANL</div>', unsafe_allow_html=True)
+
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div style="margin-bottom:1.5rem;">
+  <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:#c8d8e8;">
+    Validador de Certificados MTC
+  </div>
+  <div style="font-size:0.7rem;color:#4a6070;margin-top:2px;">
+    Normas ASTM / SAE — Control de Calidad Metalúrgico
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Instrucciones claras antes del upload ─────────────────────────────────────
+with st.expander("📋  ¿Cómo usar? Lee esto primero (30 segundos)", expanded=False):
+    st.markdown(f"""
+    **Paso 1 — Selecciona la norma** en el panel izquierdo.
+    > ¿No sabes cuál? Descarga la plantilla y el sistema sugerirá la norma más probable.
+
+    **Paso 2 — Prepara tu Excel** con 2 columnas:
+    | elemento | valor |
+    |----------|-------|
+    | C_% | 0.22 |
+    | Mn_% | 0.85 |
+    | ... | ... |
+
+    > **Alternativa:** Descarga la plantilla `plantilla_mtc_{norma_seleccionada}.xlsx` desde el panel izquierdo.
+    > Solo llena la columna **valor** con los datos de tu certificado.
+
+    **Paso 3 — Sube el archivo** y descarga el dictamen PDF.
+
+    **Nombres de elementos aceptados** (el sistema reconoce variantes automáticamente):
+    - Carbono: `C`, `C_%`, `Carbon`, `Carbono`, `Carbon %`
+    - Manganeso: `Mn`, `Mn_%`, `Manganese`, `Manganeso`
+    - Fósforo: `P`, `P_%`, `Phosphorus`, `Fosforo`
+    - Azufre: `S`, `S_%`, `Sulfur`, `Azufre`
+    - Yield Strength: `YS`, `YS_MPa`, `Yield`, `Re`, `Rp0.2`
+    - Tensile Strength: `UTS`, `UTS_MPa`, `Tensile`, `Rm`
+    - Elongación: `Elong`, `Elong_%`, `Elongation`, `El`, `A%`
+    """)
+
+# ── Upload ────────────────────────────────────────────────────────────────────
+st.markdown('<div style="font-size:0.65rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:8px;">CARGAR CERTIFICADO (.xlsx)</div>', unsafe_allow_html=True)
+
+archivo_subido = st.file_uploader(
+    "Certificado",
+    type=["xlsx", "xls"],
+    help="Sube el Excel con los datos del certificado de tu proveedor. Si no tienes el formato correcto, descarga la plantilla desde el panel izquierdo.",
+    label_visibility="collapsed"
+)
+
+
+# ── Processing ────────────────────────────────────────────────────────────
 st.markdown("<hr>", unsafe_allow_html=True)
 
 if archivo_subido is not None:
     try:
-        df = pd.read_excel(archivo_subido)
+        # Leer Excel crudo
+        df_raw = pd.read_excel(archivo_subido)
 
-        # Validar columnas
-        required_columns = {"elemento", "valor"}
-        if not required_columns.issubset(df.columns):
-            st.error(f"❌  Columnas incorrectas. Encontradas: {list(df.columns)}. Requeridas: 'elemento', 'valor'")
+        if df_raw.empty:
+            st.error("❌  El archivo está vacío. Verifica que tenga datos.")
             st.stop()
 
-        df["valor"] = pd.to_numeric(df["valor"], errors="coerce")
-        if df["valor"].isna().any():
-            st.error("❌  Valores no numéricos detectados en columna 'valor'")
+        # Limpiar y normalizar
+        try:
+            df_clean = clean_dataframe(df_raw)
+        except ValueError as e:
+            st.error(f"❌  Error en el formato del archivo: {str(e)}")
+            with st.expander("Ver contenido crudo del archivo"):
+                st.dataframe(df_raw)
             st.stop()
 
-        # Validar
-        df_resultado = validate_mtc(df, norma_seleccionada, NORMAS)
+        if df_clean.empty:
+            st.error("❌  No se encontraron datos válidos en el archivo después de limpiar filas vacías.")
+            st.stop()
 
-        # Veredicto
-        hay_rechazos = (df_resultado["resultado"] == "RECHAZADO").any()
+        # ── Auto-detección de norma ───────────────────────────────────────────
+        norma_detectada, score = detect_norma(df_clean, NORMAS)
+
+        if norma_detectada != norma_seleccionada and score >= 60:
+            st.warning(
+                f"⚠️  Los datos parecen corresponder a **{norma_detectada}** "
+                f"({score}% de elementos dentro de tolerancia), "
+                f"pero tienes seleccionada **{norma_seleccionada}**. "
+                f"¿Es correcta la norma seleccionada?"
+            )
+
+        # ── Validar ───────────────────────────────────────────────────────────
+        st.markdown("<hr>", unsafe_allow_html=True)
+
+        df_resultado = validate_mtc(df_clean, norma_seleccionada, NORMAS)
+
+        # Contar resultados
+        n_total    = len(df_resultado)
+        n_aprobado = (df_resultado["resultado"] == "APROBADO").sum()
+        n_rechazado = (df_resultado["resultado"] == "RECHAZADO").sum()
+        n_no_norma = (df_resultado["resultado"] == "NO EN NORMA").sum()
+        n_sin_valor = (df_resultado["resultado"] == "SIN VALOR").sum()
+        hay_rechazos = n_rechazado > 0
+
         veredicto = "LOTE RECHAZADO" if hay_rechazos else "LOTE APROBADO"
-        n_fail = (df_resultado["resultado"] == "RECHAZADO").sum()
-        n_pass = (df_resultado["resultado"] == "APROBADO").sum()
 
+        # ── Banner veredicto ─────────────────────────────────────────────────
         if hay_rechazos:
             fallas = df_resultado[df_resultado["resultado"] == "RECHAZADO"]["elemento"].tolist()
-            subtexto = f"{n_fail} parámetro(s) fuera de tolerancia · {', '.join(fallas)} · Norma {norma_seleccionada}"
+            subtexto = f"{n_rechazado} parámetro(s) fuera de tolerancia · {', '.join(fallas)} · Norma {norma_seleccionada}"
             st.markdown(verdict_banner(veredicto, subtexto, "fail"), unsafe_allow_html=True)
         else:
-            subtexto = f"{n_pass}/{n_pass} parámetros dentro de especificación · Norma {norma_seleccionada}"
+            subtexto = f"{n_aprobado}/{n_total} parámetros dentro de especificación · Norma {norma_seleccionada}"
             st.markdown(verdict_banner(veredicto, subtexto, "pass"), unsafe_allow_html=True)
 
-        # KPIs
+        # Advertencias adicionales
+        if n_no_norma > 0:
+            elementos_extra = df_resultado[df_resultado["resultado"] == "NO EN NORMA"]["elemento"].tolist()
+            st.warning(f"⚠️  {n_no_norma} elemento(s) no reconocidos en {norma_seleccionada}: `{', '.join(elementos_extra)}` — no fueron evaluados.")
+
+        if n_sin_valor > 0:
+            st.warning(f"⚠️  {n_sin_valor} elemento(s) sin valor numérico — verifica el archivo.")
+
+        # ── KPIs ─────────────────────────────────────────────────────────────
         k1, k2, k3, k4 = st.columns(4)
-        with k1:
-            st.metric("TOTAL ELEMENTOS", len(df_resultado))
-        with k2:
-            st.metric("APROBADOS", n_pass)
-        with k3:
-            st.metric("RECHAZADOS", n_fail)
+        with k1: st.metric("TOTAL", n_total)
+        with k2: st.metric("APROBADOS", n_aprobado)
+        with k3: st.metric("RECHAZADOS", n_rechazado)
         with k4:
-            pct = round((n_pass / len(df_resultado)) * 100)
+            evaluados = n_aprobado + n_rechazado
+            pct = round((n_aprobado / evaluados) * 100) if evaluados > 0 else 0
             st.metric("CUMPLIMIENTO", f"{pct}%")
 
-        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-        # Tabla con colores
-        st.markdown('<div class="metric-kpi">DETALLE POR ELEMENTO</div>', unsafe_allow_html=True)
+        # ── Tabla con colores ─────────────────────────────────────────────────
+        st.markdown('<div style="font-size:0.65rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:8px;">DETALLE POR ELEMENTO</div>', unsafe_allow_html=True)
 
         def color_resultado(val):
-            if val == "APROBADO":
-                return "background-color: rgba(0,212,160,0.08); color: #00d4a0"
-            elif val == "RECHAZADO":
-                return "background-color: rgba(255,77,106,0.10); color: #ff4d6a"
+            if val == "APROBADO":     return "background-color: rgba(0,212,160,0.08); color: #00d4a0"
+            elif val == "RECHAZADO":  return "background-color: rgba(255,77,106,0.10); color: #ff4d6a"
+            elif val == "NO EN NORMA": return "background-color: rgba(245,166,35,0.08); color: #f5a623"
+            elif val == "SIN VALOR":  return "background-color: rgba(245,166,35,0.08); color: #f5a623"
             return ""
 
         df_display = df_resultado[["elemento", "valor", "resultado", "desviacion"]].copy()
         df_display.columns = ["Elemento", "Valor MTC", "Resultado", "Desviación"]
-
         styled = df_display.style.map(color_resultado, subset=["Resultado"])
         st.dataframe(styled, use_container_width=True, hide_index=True)
 
-        # PDF download
+        # ── PDF Download ──────────────────────────────────────────────────────
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         try:
             pdf_bytes = generate_pdf(df_resultado, norma_seleccionada, veredicto)
@@ -374,11 +372,12 @@ if archivo_subido is not None:
         except Exception as e:
             st.error(f"❌  Error generando PDF: {str(e)}")
 
-        with st.expander("🔧  Datos crudos del DataFrame"):
+        with st.expander("🔧  Datos procesados (debug)"):
             st.dataframe(df_resultado, use_container_width=True)
 
     except Exception as e:
-        st.error(f"❌  Error procesando archivo: {str(e)}")
+        st.error(f"❌  Error inesperado: {str(e)}")
+        st.info("💡  Si el error persiste, descarga la plantilla desde el panel izquierdo y úsala para ingresar tus datos.")
 
 else:
     st.markdown(
