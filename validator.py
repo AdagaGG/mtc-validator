@@ -153,6 +153,9 @@ def detect_norma(df_clean: pd.DataFrame, normas_dict: dict) -> tuple:
         matched = 0
         total = 0
         for elem, limits in specs.items():
+            # Skip metadata keys like "label" and "descripcion"
+            if not isinstance(limits, dict) or "min" not in limits or "max" not in limits:
+                continue
             if elem in elem_val and pd.notna(elem_val[elem]):
                 total += 1
                 v = float(elem_val[elem])
@@ -193,12 +196,16 @@ def validate_mtc(df: pd.DataFrame, norma_key: str, normas_dict: dict) -> pd.Data
         elemento = str(row["elemento"]).strip()
         valor = row["valor"]
 
-        # Si el elemento no está en la norma, marcarlo como no evaluado
-        if elemento not in norma:
+        # Check if elemento is a valid spec (dict with "min" and "max"), not metadata
+        is_valid_element = elemento in norma and isinstance(norma[elemento], dict) and "min" in norma[elemento] and "max" in norma[elemento]
+        
+        if not is_valid_element:
+            # Get valid elements for error message
+            valid_elements = [k for k, v in norma.items() if isinstance(v, dict) and "min" in v and "max" in v]
             df_resultado.loc[idx, "resultado"] = "NO EN NORMA"
             df_resultado.loc[idx, "desviacion"] = (
                 f"'{elemento}' no existe en {norma_key}. "
-                f"Elementos válidos: {', '.join(norma.keys())}"
+                f"Elementos válidos: {', '.join(valid_elements)}"
             )
             continue
 

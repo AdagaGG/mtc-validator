@@ -170,7 +170,8 @@ def generate_template(norma_key: str) -> bytes:
         ws[col].alignment = Alignment(horizontal="center")
 
     norma = NORMAS[norma_key]
-    for i, (elem, limits) in enumerate(norma.items(), start=2):
+    for i, (elem, limits) in enumerate([(k, v) for k, v in norma.items() 
+                                         if isinstance(v, dict) and "min" in v and "max" in v], start=2):
         ws[f"A{i}"] = elem
         ws[f"B{i}"] = ""
         ws[f"C{i}"] = f"Min: {limits['min']} | Max: {limits['max']}"
@@ -234,7 +235,8 @@ with tab_validador:
     )
 
     st.markdown('<div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:6px;margin-top:12px;">TOLERANCIAS REFERENCIA</div>', unsafe_allow_html=True)
-    ref_data = [{"Elemento": k, "Mín": v["min"], "Máx": v["max"]} for k, v in NORMAS[norma_seleccionada].items()]
+    ref_data = [{"Elemento": k, "Mín": v["min"], "Máx": v["max"]} for k, v in NORMAS[norma_seleccionada].items() 
+                if isinstance(v, dict) and "min" in v and "max" in v]
     st.dataframe(pd.DataFrame(ref_data), hide_index=True, use_container_width=True, height=200)
 
     st.markdown('<div style="font-size:0.6rem;color:#4a6070;letter-spacing:0.1em;margin-top:12px;margin-bottom:6px;">DESCARGAR PLANTILLA</div>', unsafe_allow_html=True)
