@@ -287,32 +287,37 @@ with tab_validador:
 
     st.markdown('<div style="font-size:0.65rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:8px;">CARGAR CERTIFICADO</div>', unsafe_allow_html=True)
     
-    tab_excel, tab_pdf = st.tabs(["📄 Excel", "📕 PDF"])
+    # Initialize session state for file handling
+    if 'uploaded_file' not in st.session_state:
+        st.session_state.uploaded_file = None
+    if 'upload_method' not in st.session_state:
+        st.session_state.upload_method = None
     
-    archivo_a_validar = None
-    metodo_ingreso = None
+    tab_excel, tab_pdf = st.tabs(["📄 Excel", "📕 PDF"])
     
     with tab_excel:
         archivo_excel = st.file_uploader(
             "Excel", type=["xlsx", "xls"], label_visibility="collapsed", key="excel_upload"
         )
-        archivo_a_validar = archivo_excel
-        metodo_ingreso = "excel" if archivo_excel else None
+        if archivo_excel is not None:
+            st.session_state.uploaded_file = archivo_excel
+            st.session_state.upload_method = "excel"
     
     with tab_pdf:
         archivo_pdf = st.file_uploader(
             "PDF", type=["pdf"], label_visibility="collapsed", key="pdf_upload"
         )
-        archivo_a_validar = archivo_pdf
-        metodo_ingreso = "pdf" if archivo_pdf else None
+        if archivo_pdf is not None:
+            st.session_state.uploaded_file = archivo_pdf
+            st.session_state.upload_method = "pdf"
 
     st.markdown("<hr>", unsafe_allow_html=True)
 
-    if archivo_a_validar is not None:
+    if st.session_state.uploaded_file is not None:
         try:
-            if metodo_ingreso == "pdf":
+            if st.session_state.upload_method == "pdf":
                 st.info("📥 Extrayendo datos del PDF...")
-                df_clean, metodo_ocr = extract_from_pdf(archivo_a_validar.read())
+                df_clean, metodo_ocr = extract_from_pdf(st.session_state.uploaded_file.read())
                 
                 if df_clean.empty:
                     st.error("❌ No se extrajeron datos del PDF.")
@@ -324,7 +329,7 @@ with tab_validador:
                 df_clean = st.data_editor(df_clean, num_rows="dynamic", use_container_width=True, key="pdf_editor")
                 
             else:
-                df_raw = pd.read_excel(archivo_a_validar)
+                df_raw = pd.read_excel(st.session_state.uploaded_file)
                 if df_raw.empty:
                     st.error("❌ El archivo está vacío.")
                     st.stop()
@@ -404,7 +409,7 @@ with tab_validador:
                     norma_seleccionada, 
                     veredicto,
                     empresa=st.session_state.name,
-                    archivo=archivo_a_validar.name if hasattr(archivo_a_validar, 'name') else "sin_nombre"
+                    archivo=st.session_state.uploaded_file.name if hasattr(st.session_state.uploaded_file, 'name') else "sin_nombre"
                 )
                 
                 col_pdf, col_save = st.columns([3, 1])
@@ -423,10 +428,10 @@ with tab_validador:
                             validacion_id = save_validacion(
                                 usuario=st.session_state.name,
                                 norma=norma_seleccionada,
-                                archivo=archivo_a_validar.name if hasattr(archivo_a_validar, 'name') else "sin_nombre",
+                                archivo=st.session_state.uploaded_file.name if hasattr(st.session_state.uploaded_file, 'name') else "sin_nombre",
                                 df_resultado=df_resultado,
                                 veredicto=veredicto,
-                                metodo=metodo_ingreso,
+                                metodo=st.session_state.upload_method,
                                 pdf_report=pdf_bytes
                             )
                             if validacion_id:
