@@ -24,40 +24,44 @@ st.set_page_config(
 )
 
 # ── AUTHENTICATION ───────────────────────────────────────────────────────────
-@st.cache_resource
-def load_authenticator():
+def load_config():
+    """Load YAML config without caching (no widgets here)"""
     try:
         with open("config.yaml") as config_file:
             config = yaml.load(config_file, Loader=SafeLoader)
             if not config or 'credentials' not in config:
                 raise ValueError("Invalid YAML structure: missing 'credentials' key")
+            return config
     except FileNotFoundError:
         st.error("❌ config.yaml not found. Create it in the project root directory.")
         st.stop()
     except Exception as e:
         st.error(f"❌ Error loading config.yaml: {str(e)}")
         st.stop()
-    
-    try:
-        # Ensure required keys
-        if 'cookie' not in config:
-            config['cookie'] = {'expiry_days': 30, 'key': 'mtc_secret_key_2024', 'name': 'mtc_auth'}
-        if 'pre-authorized' not in config:
-            config['pre-authorized'] = []
-        
-        authenticator = stauth.Authenticate(
-            config['credentials'],
-            config['cookie']['name'],
-            config['cookie']['key'],
-            config['cookie']['expiry_days'],
-            config['pre-authorized']
-        )
-        return authenticator
-    except Exception as e:
-        st.error(f"❌ Authentication setup error: {str(e)}")
-        st.stop()
 
-authenticator = load_authenticator()
+# Load config once
+config = load_config()
+
+# Ensure required keys
+if 'cookie' not in config:
+    config['cookie'] = {'expiry_days': 30, 'key': 'mtc_secret_key_2024', 'name': 'mtc_auth'}
+if 'pre-authorized' not in config:
+    config['pre-authorized'] = []
+
+# Create authenticator (with widgets, no caching)
+try:
+    authenticator = stauth.Authenticate(
+        config['credentials'],
+        config['cookie']['name'],
+        config['cookie']['key'],
+        config['cookie']['expiry_days'],
+        config['pre-authorized']
+    )
+except Exception as e:
+    st.error(f"❌ Authentication setup error: {str(e)}")
+    st.stop()
+
+# Show login form
 name, authentication_status, username = authenticator.login("main", "sidebar")
 
 if authentication_status is False:
@@ -69,12 +73,10 @@ elif authentication_status is None:
 
 # Load user email from config after authentication
 if authentication_status and username:
-    with open("config.yaml") as config_file:
-        config = yaml.load(config_file, Loader=SafeLoader)
-        user_data = config['credentials']['usernames'].get(username, {})
-        st.session_state.email = user_data.get('email', 'no-email@mtcvalidator.com')
-        st.session_state.username = username
-        st.session_state.name = name
+    user_data = config['credentials']['usernames'].get(username, {})
+    st.session_state.email = user_data.get('email', 'no-email@mtcvalidator.com')
+    st.session_state.username = username
+    st.session_state.name = name
 
 # Initialize database on first load
 if "db_initialized" not in st.session_state:
