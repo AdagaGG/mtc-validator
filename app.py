@@ -8,7 +8,6 @@ import pandas as pd
 import io
 import yaml
 from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
 from normas import NORMAS
 from validator import validate_mtc, clean_dataframe, detect_norma
 from report import generate_pdf
@@ -25,65 +24,77 @@ st.set_page_config(
 
 # ── AUTHENTICATION ───────────────────────────────────────────────────────────
 def load_config():
-    """Load YAML config without caching (no widgets here)"""
+    """Load YAML config"""
     try:
         with open("config.yaml") as config_file:
             config = yaml.load(config_file, Loader=SafeLoader)
             if not config or 'credentials' not in config:
                 raise ValueError("Invalid YAML structure: missing 'credentials' key")
             return config
-    except FileNotFoundError:
-        st.error("❌ config.yaml not found. Create it in the project root directory.")
-        st.stop()
     except Exception as e:
         st.error(f"❌ Error loading config.yaml: {str(e)}")
         st.stop()
 
-# Load config once
+def verify_credentials(username: str, password: str, config: dict) -> dict:
+    """Verify username and password"""
+    users = config.get('credentials', {}).get('usernames', {})
+    if username in users:
+        user = users[username]
+        if user.get('password') == password:
+            return user
+    return None
+
+# Initialize session state
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+    st.session_state.username = None
+    st.session_state.name = None
+    st.session_state.email = None
+
+# Load config
 config = load_config()
 
-# Ensure required keys
-if 'cookie' not in config:
-    config['cookie'] = {'expiry_days': 30, 'key': 'mtc_secret_key_2024', 'name': 'mtc_auth'}
-if 'pre-authorized' not in config:
-    config['pre-authorized'] = []
-
-# Create authenticator (with widgets, no caching)
-try:
-    authenticator = stauth.Authenticate(
-        config['credentials'],
-        config['cookie']['name'],
-        config['cookie']['key'],
-        config['cookie']['expiry_days'],
-        config['pre-authorized']
-    )
-except Exception as e:
-    st.error(f"❌ Authentication setup error: {str(e)}")
+# ── LOGIN UI ────────────────────────────────────────────────────────────────
+if not st.session_state.authenticated:
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+      <div style="font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:#00d4a0;">
+        MTC Validator
+      </div>
+      <div style="font-size:0.8rem;color:#4a6070;">v0.3 — Control de Calidad Metalúrgico</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### 👤 Autenticación")
+        
+        username = st.text_input("Usuario", placeholder="Ingresa tu usuario")
+        password = st.text_input("Contraseña", type="password", placeholder="Ingresa tu contraseña")
+        
+        if st.button("Ingresar", use_container_width=True, type="primary"):
+            user_data = verify_credentials(username, password, config)
+            
+            if user_data:
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                st.session_state.name = user_data.get('first_name', username)
+                st.session_state.email = user_data.get('email', 'no-email@mtcvalidator.com')
+                st.success("✓ Autenticación exitosa")
+                st.rerun()
+            else:
+                st.error("❌ Usuario o contraseña incorrectos")
+        
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("""
+        **Credenciales de prueba:**
+        - `piloto_empresa1` / `piloto2024`
+        - `admin` / `admin2024`
+        - `tester` / `test2024`
+        """)
     st.stop()
 
-# Show login form
-login_result = authenticator.login("main", "sidebar")
-
-# Handle login result safely
-if login_result is None:
-    st.error("❌ Authentication system error. Please refresh the page.")
-    st.stop()
-
-name, authentication_status, username = login_result
-
-if authentication_status is False:
-    st.error("❌ Usuario o contraseña incorrectos. Intenta de nuevo.")
-    st.stop()
-elif authentication_status is None:
-    st.warning("👤 Ingresa tu usuario y contraseña para continuar.")
-    st.stop()
-
-# Load user email from config after authentication
-if authentication_status and username:
-    user_data = config['credentials']['usernames'].get(username, {})
-    st.session_state.email = user_data.get('email', 'no-email@mtcvalidator.com')
-    st.session_state.username = username
-    st.session_state.name = name
+# ── Main app (after authentication) ────────────────────────────────────────
 
 # Initialize database on first load
 if "db_initialized" not in st.session_state:
@@ -185,7 +196,10 @@ with st.sidebar:
     st.markdown(f'<div style="font-size:0.65rem;color:#4a6070;letter-spacing:0.1em;margin-bottom:8px;">👤 {st.session_state.name}</div>', unsafe_allow_html=True)
     
     if st.button("🚪 Logout", use_container_width=True):
-        authenticator.logout("Logout", "sidebar")
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        st.session_state.name = None
+        st.session_state.email = None
         st.rerun()
 
     st.markdown("<hr>", unsafe_allow_html=True)
