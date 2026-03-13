@@ -1,5 +1,5 @@
 """
-MTC Validator — report.py v2
+MTC Validator - report.py v2
 Professional executive PDF reports with charts
 """
 
@@ -19,19 +19,19 @@ def generate_pdf(df_resultado, norma_key, veredicto, empresa="", archivo="") -> 
     
     Args:
         df_resultado: DataFrame with validation results (columns: elemento, valor, resultado, desviacion)
-        norma_key: str — norm key (e.g., 'SAE1045')
-        veredicto: str — 'LOTE APROBADO' or 'LOTE RECHAZADO'
-        empresa: str — company name (optional)
-        archivo: str — original filename (optional)
+        norma_key: str - norm key (e.g., 'SAE1045')
+        veredicto: str - 'LOTE APROBADO' or 'LOTE RECHAZADO'
+        empresa: str - company name (optional)
+        archivo: str - original filename (optional)
     
     Returns:
-        bytes — PDF content
+        bytes - PDF content
     """
     
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.add_page()
     
-    # ── PAGE 1 — COVER ───────────────────────────────────────────────────────────
+    # -- PAGE 1 - COVER --
     # Header bar
     pdf.set_fill_color(13, 28, 24)  # #0d1218
     pdf.set_font("Courier", "", 12)  # Set default font before using cell
@@ -97,7 +97,7 @@ def generate_pdf(df_resultado, norma_key, veredicto, empresa="", archivo="") -> 
     pdf.cell(col_width, 6, f"Elementos", border=1, align="L")
     pdf.cell(col_width, 6, f"{n_total} evaluados", border=1, ln=True)
     
-    # ── PAGE 2 — DETAILED RESULTS ────────────────────────────────────────────────
+    # -- PAGE 2 - DETAILED RESULTS --───────────
     pdf.add_page()
     
     pdf.set_font("Courier", "B", 12)
