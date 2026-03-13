@@ -1,6 +1,7 @@
 """
-MTC Validator — ocr_pdf.py
+MTC Validator — ocr_pdf.py v2 (Dual Format)
 PDF extraction: pdfplumber (digital) + Mistral API (scanned/OCR)
+Tested on 2 formats: Ternium/AHMSA (Actual rows) and Yieh Corporation (Product ID rows)
 """
 
 import pandas as pd
@@ -9,204 +10,263 @@ import io
 import re
 import requests
 import json
+import base64
 import streamlit as st
-from pdf2image import convert_from_bytes
-from PIL import Image
 
 
-def pdf_to_images(pdf_bytes: bytes) -> list:
-    """
-    Convert PDF pages to PIL Images for OCR.
-    Uses pdf2image library (requires poppler-utils on system).
-    
-    Returns:
-        list of PIL Image objects, or empty list on failure
-    """
-    try:
-        images = convert_from_bytes(pdf_bytes, dpi=150)
-        return images
-    except Exception as e:
-        print(f"Error converting PDF to images: {e}")
-        return []
+# ===== ALIASES DICT (tested and working) =====
+ALIASES = {
+    # Chemical elements
+    "si": "Si_%", "fe": "Fe_%", "cu": "Cu_%", "mn": "Mn_%",
+    "mg": "Mg_%", "cr": "Cr_%", "zn": "Zn_%", "ti": "Ti_%",
+    "al": "Al_%", "c": "C_%", "p": "P_%", "s": "S_%",
+    "ni": "Ni_%", "mo": "Mo_%", "v": "V_%", "nb": "Nb_%",
+    # Yield Strength variants
+    "y.s.(mpa)": "YS_MPa", "y.s. (mpa)": "YS_MPa", "ys": "YS_MPa",
+    "yield strength": "YS_MPa", "yield strength (mpa)": "YS_MPa",
+    "re": "YS_MPa", "rp0.2": "YS_MPa", "limite elastico": "YS_MPa",
+    # Tensile Strength variants
+    "t.s.(mpa)": "UTS_MPa", "t.s. (mpa)": "UTS_MPa",
+    "tensile strength": "UTS_MPa", "tensile strength (mpa)": "UTS_MPa",
+    "uts": "UTS_MPa", "rm": "UTS_MPa", "resistencia tensil": "UTS_MPa",
+    # Elongation variants
+    "el(%)": "Elong_%", "el( %)": "Elong_%", "elongation": "Elong_%",
+    "elongation (%)": "Elong_%", "elong": "Elong_%", "a%": "Elong_%",
+    # Spanish
+    "carbono": "C_%", "carbon": "C_%", "manganeso": "Mn_%",
+    "fosforo": "P_%", "fósforo": "P_%", "azufre": "S_%",
+    "silicio": "Si_%", "cromo": "Cr_%", "molibdeno": "Mo_%",
+}
+
+# Cells to skip — watermarks, keywords, non-data
+SKIP_VALUES = {'-', '', 'none', 'null', 's', 'a', 'm', 'p', 'l', 'e',
+               'sample', 'n/a', 'n.a.', '-', '–'}
+SKIP_FIRST_CELL = {'product', 'chemical', 'mechanical', 'subtotal',
+                   'heat', 'size', 'remarks', 'sample', 'manager',
+                   'element', 'property', 'properties', 'others',
+                   'min', 'max', 'typical', 'specification'}
 
 
-def extract_with_pdfplumber(pdf_bytes: bytes) -> pd.DataFrame:
+# ===== HELPER FUNCTIONS =====
+
+def _clean_header(cell: str) -> str:
     """
-    Extract MTC data using pdfplumber (for digital PDFs).
-    
-    Returns:
-        DataFrame with 'elemento' and 'valor' columns, or empty DataFrame
+    Extract element name from a header cell that may contain limits.
+    'Si\n< 0.25%' → 'Si'
+    'Y.S.(Mpa)\n17 – 110' → 'Y.S.(Mpa)'
     """
-    data = []
-    element_patterns = {
-        "C_%": r"(?:Carbon|C|C\s*(?:%|pct))\s*[:=]?\s*([\d.]+)",
-        "Mn_%": r"(?:Manganese|Mn|Mangan)\s*[:=]?\s*([\d.]+)",
-        "P_%": r"(?:Phosphorus|P|Phos)\s*[:=]?\s*([\d.]+)",
-        "S_%": r"(?:Sulfur|S)\s*[:=]?\s*([\d.]+)",
-        "Si_%": r"(?:Silicon|Si)\s*[:=]?\s*([\d.]+)",
-        "Cr_%": r"(?:Chromium|Chrome|Cr)\s*[:=]?\s*([\d.]+)",
-        "Mo_%": r"(?:Molybdenum|Mo)\s*[:=]?\s*([\d.]+)",
-        "YS_MPa": r"(?:Yield|YS|Re|Rp0\.2)\s*[:=]?\s*([\d.]+)",
-        "UTS_MPa": r"(?:Tensile|UTS|Rm|Fu)\s*[:=]?\s*([\d.]+)",
-        "Elong_%": r"(?:Elongation|Elong|A%)\s*[:=]?\s*([\d.]+)",
-    }
-    
+    if not cell:
+        return ""
+    # Take first line only
+    name = str(cell).split('\n')[0].strip()
+    # Remove limit patterns like "< 0.25%" or "17 – 110"
+    name = re.sub(r'[<>≤≥]\s*[\d.]+\s*%?', '', name).strip()
+    name = re.sub(r'[\d.]+\s*[-–]\s*[\d.]+', '', name).strip()
+    return name.strip()
+
+
+def _normalize(name: str) -> str | None:
+    """Map raw header name to canonical element name using ALIASES."""
+    if not name:
+        return None
+    return ALIASES.get(name.strip().lower(), None)
+
+
+def _is_data_row(row: list) -> bool:
+    """
+    Detect if a table row contains actual measurement data.
+    Returns True for Product ID rows and Actual rows.
+    Returns False for headers, min/max specs, watermarks, subtotals.
+    """
+    if not row or not row[0]:
+        return False
+    first = str(row[0]).strip().lower()
+    # Skip known non-data first cells
+    if any(kw in first for kw in SKIP_FIRST_CELL):
+        return False
+    # Skip rows that are entirely '-' or letters (watermark)
+    numeric_count = 0
+    for v in row[1:]:
+        if v and str(v).strip() not in SKIP_VALUES:
+            try:
+                float(str(v).strip())
+                numeric_count += 1
+            except:
+                pass
+    return numeric_count >= 3
+
+
+def _extract_headers(table: list) -> list:
+    """
+    Find the row with element symbol headers.
+    Handles multi-level headers by finding the row with 4+ short element names.
+    """
+    for row in table[:4]:
+        if not row:
+            continue
+        cleaned = [_clean_header(str(c)) if c else "" for c in row]
+        # This is a header row if it has 4+ known element aliases
+        known = sum(1 for h in cleaned if h.lower() in ALIASES)
+        if known >= 3:
+            return cleaned
+    return []
+
+
+# ===== MAIN EXTRACTION FUNCTIONS =====
+
+def _extract_pdfplumber(pdf_bytes: bytes) -> pd.DataFrame:
+    """
+    Extract MTC data from digital PDF using pdfplumber.
+    Handles both Format A (Actual row) and Format B (Product ID rows).
+    """
+    results = []
+
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            # Try table extraction first
-            for page_num, page in enumerate(pdf.pages):
+            for page in pdf.pages:
                 tables = page.extract_tables()
-                if tables:
-                    for table in tables:
+                if not tables:
+                    continue
+
+                for table in tables:
+                    if not table or len(table) < 3:
+                        continue
+
+                    headers = _extract_headers(table)
+                    if not headers or len(headers) < 4:
+                        continue
+
+                    # Try FORMAT A first: look for "Actual" row
+                    actual_row = None
+                    for row in table:
+                        if row and row[0] and str(row[0]).strip().lower() == "actual":
+                            actual_row = row
+                            break
+
+                    # FORMAT B fallback: use first valid data row
+                    if actual_row is None:
                         for row in table:
-                            if row and len(row) >= 2:
-                                elem_cell = str(row[0]).lower() if row[0] else ""
-                                val_cell = str(row[1]).lower() if row[1] else ""
-                                
-                                # Check if row contains element name and numeric value
-                                for elem_name, pattern in element_patterns.items():
-                                    # Filter out None values and convert to strings
-                                    row_str = " ".join(str(c).strip() for c in row if c is not None)
-                                    if re.search(elem_name.lower(), elem_cell) or re.search(pattern, row_str):
-                                        try:
-                                            # Try to extract value
-                                            match = re.search(r"([\d.]+)", val_cell)
-                                            if match:
-                                                valor = float(match.group(1))
-                                                data.append({"elemento": elem_name, "valor": valor})
-                                        except:
-                                            pass
-            
-            # If no tables found, try text extraction with regex
-            if not data:
-                for page in pdf.pages:
-                    text = page.extract_text() or ""
-                    for elem_name, pattern in element_patterns.items():
-                        matches = re.finditer(pattern, text, re.IGNORECASE)
-                        for match in matches:
-                            try:
-                                valor = float(match.group(1))
-                                data.append({"elemento": elem_name, "valor": valor})
-                            except:
-                                pass
-        
-        if data:
-            df = pd.DataFrame(data).drop_duplicates(subset=["elemento"])
-            return df
-        return pd.DataFrame()
+                            if _is_data_row(row):
+                                actual_row = row
+                                break
+
+                    if actual_row is None:
+                        continue
+
+                    # Map values to canonical element names
+                    for j, val in enumerate(actual_row):
+                        if j == 0 or j >= len(headers):
+                            continue
+                        header = headers[j]
+                        norm = _normalize(header)
+                        if not norm:
+                            continue
+                        val_str = str(val).strip() if val else ""
+                        if val_str.lower() in SKIP_VALUES:
+                            continue
+                        try:
+                            num = float(val_str)
+                            # No duplicates — first occurrence wins
+                            if not any(r['elemento'] == norm for r in results):
+                                results.append({'elemento': norm, 'valor': num})
+                        except:
+                            pass
     except Exception as e:
-        print(f"Error with pdfplumber: {e}")
-        return pd.DataFrame()
+        print(f"Error in _extract_pdfplumber: {e}")
+
+    return pd.DataFrame(results) if results else pd.DataFrame(columns=['elemento', 'valor'])
 
 
-def extract_with_mistral_ocr(pdf_bytes: bytes) -> pd.DataFrame:
+def _extract_mistral(pdf_bytes: bytes) -> pd.DataFrame:
     """
-    Extract MTC data using Mistral API (for scanned PDFs).
+    Fallback OCR using Mistral Pixtral API for scanned PDFs.
+    Only called if pdfplumber returns fewer than 3 elements.
     Requires MISTRAL_API_KEY in st.secrets.
-    
-    Returns:
-        DataFrame with 'elemento' and 'valor' columns, or empty DataFrame
     """
+    api_key = st.secrets.get("MISTRAL_API_KEY", None)
+    if not api_key:
+        return pd.DataFrame(columns=['elemento', 'valor'])
+
     try:
-        api_key = st.secrets.get("MISTRAL_API_KEY", "")
-        if not api_key:
-            print("MISTRAL_API_KEY not found in secrets")
-            return pd.DataFrame()
-        
-        images = pdf_to_images(pdf_bytes)
-        if not images:
-            return pd.DataFrame()
-        
-        # Convert first page to base64
-        first_image = images[0]
-        img_byte_arr = io.BytesIO()
-        first_image.save(img_byte_arr, format='JPEG')
-        img_byte_arr.seek(0)
-        import base64
-        img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode()
-        
-        # Call Mistral API
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        
+        b64 = base64.b64encode(pdf_bytes).decode('utf-8')
         payload = {
             "model": "pixtral-12b-2409",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "url": f"data:image/jpeg;base64,{img_base64}",
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Extract all chemical composition values and mechanical properties "
-                                "from this Mill Test Certificate. Return ONLY a JSON array like: "
-                                "[{'elemento': 'C_%', 'valor': 0.22}, {'elemento': 'Mn_%', 'valor': 0.85}]. "
-                                "Use these exact element names: C_%, Mn_%, P_%, S_%, Si_%, Cr_%, Mo_%, "
-                                "YS_MPa, UTS_MPa, Elong_%"
-                            )
-                        }
-                    ]
-                }
-            ]
+            "max_tokens": 1000,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:application/pdf;base64,{b64}"}
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "Extract all chemical composition values and mechanical properties "
+                            "from this Mill Test Certificate. "
+                            "Return ONLY a valid JSON array, no markdown, no explanation. "
+                            "Format: [{\"elemento\": \"C_%\", \"valor\": 0.22}] "
+                            "Use ONLY these element names: "
+                            "Si_%, Fe_%, Cu_%, Mn_%, Mg_%, Cr_%, Zn_%, Ti_%, Al_%, "
+                            "C_%, P_%, S_%, Ni_%, Mo_%, V_%, "
+                            "YS_MPa, UTS_MPa, Elong_% "
+                            "Skip elements with value '-' or missing."
+                        )
+                    }
+                ]
+            }]
         }
-        
-        response = requests.post(
+        resp = requests.post(
             "https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json=payload,
-            headers=headers,
             timeout=30
         )
-        
-        if response.status_code == 200:
-            result = response.json()
-            content = result["choices"][0]["message"]["content"]
-            
-            # Extract JSON from response
-            json_match = re.search(r'\[.*\]', content, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                data = json.loads(json_str)
-                df = pd.DataFrame(data)
-                # Ensure columns exist
-                if "elemento" in df.columns and "valor" in df.columns:
-                    df["valor"] = pd.to_numeric(df["valor"], errors="coerce")
-                    return df
-        
-        return pd.DataFrame()
+        resp.raise_for_status()
+        content = resp.json()['choices'][0]['message']['content']
+        # Clean markdown fences if present
+        content = content.replace('```json', '').replace('```', '').strip()
+        data = json.loads(content)
+        return pd.DataFrame(data)
     except Exception as e:
-        print(f"Error with Mistral OCR: {e}")
-        return pd.DataFrame()
+        print(f"Error in _extract_mistral: {e}")
+        return pd.DataFrame(columns=['elemento', 'valor'])
+
+
+# ===== PUBLIC API =====
+
+METHOD_MESSAGES = {
+    "pdfplumber":         ("✅ Extraído con pdfplumber (PDF digital)", "success"),
+    "mistral_ocr":        ("🤖 Extraído con Mistral OCR (PDF escaneado)", "info"),
+    "mistral_unavailable":("⚠️ Mistral API no configurada — solo PDFs digitales soportados.", "warning"),
+    "not_found":          ("❌ No se detectaron datos. Verifica que sea un MTC válido o usa la plantilla Excel.", "error"),
+}
 
 
 def extract_from_pdf(pdf_bytes: bytes) -> tuple[pd.DataFrame, str]:
     """
-    Extract MTC data from PDF using two methods:
-    1. pdfplumber (for digital PDFs with searchable text/tables)
-    2. Mistral API (fallback for scanned PDFs)
-    
-    Args:
-        pdf_bytes: bytes — PDF file content
-    
+    Public function. Try pdfplumber first, then Mistral OCR fallback.
+    Never raises exceptions.
+
     Returns:
-        (DataFrame with 'elemento' and 'valor' columns, method_used string)
-        method_used is: 'pdfplumber', 'mistral_ocr', or 'not_found'
-        Never raises exceptions — returns empty DataFrame with 'not_found' on failure
+        (DataFrame with columns 'elemento' and 'valor', method_used)
     """
-    # Try pdfplumber first (faster, no API call)
-    df_pdfplumber = extract_with_pdfplumber(pdf_bytes)
-    if not df_pdfplumber.empty:
-        return df_pdfplumber, "pdfplumber"
-    
-    # Fallback to Mistral OCR for scanned PDFs
-    df_mistral = extract_with_mistral_ocr(pdf_bytes)
-    if not df_mistral.empty:
-        return df_mistral, "mistral_ocr"
-    
-    # No data found
-    return pd.DataFrame(columns=["elemento", "valor"]), "not_found"
+    # Method 1: pdfplumber
+    try:
+        df = _extract_pdfplumber(pdf_bytes)
+        if len(df) >= 3:
+            return df, "pdfplumber"
+    except Exception as e:
+        print(f"pdfplumber error: {e}")
+
+    # Method 2: Mistral OCR
+    try:
+        if st.secrets.get("MISTRAL_API_KEY", None):
+            df = _extract_mistral(pdf_bytes)
+            if len(df) >= 1:
+                return df, "mistral_ocr"
+            return pd.DataFrame(columns=['elemento', 'valor']), "mistral_unavailable"
+    except Exception as e:
+        print(f"Mistral error: {e}")
+
+    return pd.DataFrame(columns=['elemento', 'valor']), "not_found"
